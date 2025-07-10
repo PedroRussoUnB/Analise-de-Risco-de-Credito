@@ -1447,8 +1447,8 @@ def display_advanced_analysis_page():
             - **Definir Faixas de Ação:** Clientes com pontuação abaixo de um certo limiar (ex: 10 pontos) poderiam ter um processo de aprovação agilizado. Clientes com pontuação acima de 40, por exemplo, seriam automaticamente direcionados para uma análise sênior. Isso otimiza o tempo da equipe e padroniza a avaliação inicial.
         """)
 
-        st.markdown("##### 5. Estratégias de Marketing e Produto por Segmento de Cliente (Cluster)")
-        st.markdown("""
+   st.markdown("##### 5. Estratégias de Marketing e Produto por Segmento de Cliente (Cluster)")
+   st.markdown("""
         - **Recomendação:** Utilizar os segmentos de clientes descobertos pelo algoritmo K-Means para criar campanhas de marketing e ofertas de produtos personalizadas, aumentando a eficácia das ações e a satisfação do cliente.
         - **Ação Prática:**
             - **Cluster de "Alto Potencial" (Baixo Risco, Alto Valor de Crédito):** Oferecer produtos premium, como cartões de crédito com maiores limites, programas de cashback mais agressivos e acesso a linhas de crédito pré-aprovadas para investimentos.
