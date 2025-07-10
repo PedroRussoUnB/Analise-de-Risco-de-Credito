@@ -33,6 +33,65 @@ from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, classifi
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_score
 import shap
+import joblib
+
+def run_and_save_all_artifacts():
+    st.info("Iniciando a geração de artefatos... Este processo é MUITO lento e deve ser executado apenas uma vez.")
+
+    with st.spinner("Passo 1 de 5: Carregando e processando dados..."):
+        raw_df, _ = load_and_profile_data()
+        processed_df = execute_feature_engineering(raw_df)
+    st.success("Passo 1 concluído.")
+
+    with st.spinner("Passo 2 de 5: Preparando dados para modelagem..."):
+        modeling_data = prepare_data_for_modeling(
+            processed_df,
+            ProjectConfig.TARGET_VARIABLE,
+            ProjectConfig.TEST_SIZE_RATIO,
+            ProjectConfig.RANDOM_STATE_SEED
+        )
+        joblib.dump(modeling_data, 'artifacts/modeling_data.joblib')
+    st.success("Passo 2 concluído.")
+
+    with st.spinner("Passo 3 de 5: Executando Seleção de Features (RFECV)... Isso pode levar cerca de 10 minutos."):
+        selection_artifacts = run_rfe_cv_feature_selection(modeling_data)
+        joblib.dump(selection_artifacts, 'artifacts/selection_artifacts.joblib')
+    st.success("Passo 3 concluído.")
+
+    with st.spinner("Passo 4 de 5: Treinando modelos de baseline..."):
+        baseline_artifacts = train_baseline_models(modeling_data, selection_artifacts)
+        joblib.dump(baseline_artifacts, 'artifacts/baseline_artifacts.joblib')
+    st.success("Passo 4 concluído.")
+
+    with st.spinner("Passo 5 de 5: Calculando SHAP para o modelo final... Isso pode demorar mais de 10 minutos."):
+        final_artifacts = finalize_and_explain_model(
+            baseline_artifacts,
+            modeling_data,
+            selection_artifacts
+        )
+        joblib.dump(final_artifacts, 'artifacts/final_artifacts.joblib')
+    st.success("Passo 5 concluído.")
+    
+    st.balloons()
+    st.header("Geração de Artefatos Concluída com Sucesso!")
+    st.warning("Você já pode desmarcar a opção no 'Painel de Administrador' e usar o app no modo rápido.")
+
+@st.cache_resource
+def load_artifacts():
+    try:
+        modeling_data = joblib.load('artifacts/modeling_data.joblib')
+        selection_artifacts = joblib.load('artifacts/selection_artifacts.joblib')
+        baseline_artifacts = joblib.load('artifacts/baseline_artifacts.joblib')
+        final_artifacts = joblib.load('artifacts/final_artifacts.joblib')
+        return {
+            "modeling_data": modeling_data,
+            "selection_artifacts": selection_artifacts,
+            "baseline_artifacts": baseline_artifacts,
+            "final_artifacts": final_artifacts,
+        }
+    except FileNotFoundError:
+        st.error("ERRO: Artefatos não encontrados. Ative o 'Painel de Administrador' na barra lateral, marque a caixa e clique no botão 'Gerar Artefatos'.", icon="🚨")
+        return None
 
 # --- Configuração da Página e do Projeto ---
 
@@ -205,44 +264,47 @@ def display_home_page():
     st.info("Utilize o menu de navegação na barra lateral esquerda para explorar as diferentes etapas desta análise completa, desde a preparação dos dados até a tomada de decisão gerencial.", icon="🧭")
 
 def main():
-    """
-    Função principal que controla a navegação e a renderização das páginas
-    do aplicativo Streamlit. É o ponto central que orquestra toda a aplicação.
-    """
     initialize_session_state()
     px.defaults.template = ProjectConfig.get_plotly_template()
 
     st.sidebar.title("Painel de Controle 🎛️")
     st.sidebar.markdown("Navegue pelas etapas da análise de risco de crédito.")
     
+    with st.sidebar.expander("Painel de Administrador ⚙️"):
+        generate_mode = st.checkbox("MODO GERAÇÃO: Gerar novos artefatos (LENTO)")
+        if generate_mode:
+            st.warning("O modo de geração está ativo. O app ficará muito lento.")
+            if st.button("▶️ INICIAR GERAÇÃO DE ARTEFATOS"):
+                run_and_save_all_artifacts()
+                st.stop()
+
     page_options = {
         "Página Inicial": "🏠",
         "Análise e Preparação dos Dados": "📊",
         "Análise Exploratória (EDA)": "🔍",
         "Modelagem Supervisionada": "⚙️",
         "Decisão Gerencial e Não Supervisionada": "🧠",
-        "Documentação e Exportação": "📄"
     }
     
     page_selection = st.sidebar.radio(
         "Menu de Navegação:",
         options=page_options.keys(),
-        format_func=lambda x: f"{page_options[x]} {x}" # Adiciona ícones ao rádio
+        format_func=lambda x: f"{page_options[x]} {x}"
     )
     
-    st.sidebar.markdown("---")
     st.sidebar.markdown(
         """
         <div style='text-align: left; font-size: 0.9em;'>
             <strong>Prova Final</strong><br>
             <span>EPR0072 - Sistemas de Informação</span><br>
-            <span>Prof. João Gabriel de Moraes Souza</span>
+            <span>Prof. João Gabriel de Moraes Souza</span><br><br>
+            <strong>Desenvolvedor:</strong><br>
+            <span>Pedro Richetti Russo</span>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # Roteamento das páginas
     if page_selection == "Página Inicial":
         display_home_page()
     elif page_selection == "Análise e Preparação dos Dados":
@@ -253,8 +315,6 @@ def main():
         display_modeling_page()
     elif page_selection == "Decisão Gerencial e Não Supervisionada":
         display_advanced_analysis_page()
-    elif page_selection == "Documentação e Exportação":
-        display_export_and_docs_page(st.session_state.artifacts)
 
 def display_dataset_page():
     """
@@ -823,40 +883,39 @@ def render_feature_selection_module(modeling_data):
         **Justificativa da Escolha (RFECV):** Diferente de métodos univariados, o RFECV considera a interação entre as variáveis, resultando em um conjunto de features mais robusto e performático. Ele nos ajuda a reduzir a complexidade do modelo, diminuir o risco de overfitting e, muitas vezes, aumentar a interpretabilidade, focando apenas no que realmente importa.
         """)
         
-        if st.button("Executar Seleção de Features com RFECV", key="fs_button_rfe", type="primary"):
-            selection_artifacts = run_rfe_cv_feature_selection(modeling_data)
+        artifacts_cache = load_artifacts()
+        if artifacts_cache:
+            selection_artifacts = artifacts_cache['selection_artifacts']
             st.session_state.artifacts['selection_artifacts'] = selection_artifacts
             st.session_state.app_stage = 'features_selected'
-            st.success("Seleção de features com RFECV concluída!")
-            st.rerun()
 
-    if 'selection_artifacts' in st.session_state.get('artifacts', {}):
-        with st.container(border=True):
-            artifacts = st.session_state.artifacts['selection_artifacts']
-            st.subheader("Resultados da Seleção de Features")
-            st.metric(label="Número ideal de features encontrado", value=artifacts['optimal_n_features'])
-            
-            if artifacts.get('cv_results_scores') is not None:
-                cv_scores = artifacts['cv_results_scores']
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=list(range(1, len(cv_scores) + 1)), y=cv_scores,
-                    mode='lines+markers', marker=dict(color=ProjectConfig.PRIMARY_COLOR), line=dict(width=3)
-                ))
-                fig.add_vline(x=artifacts['optimal_n_features'], line_width=2, line_dash="dash", line_color=ProjectConfig.ACCENT_COLOR,
-                             annotation_text="Número Ótimo de Features", annotation_position="top left")
-                fig.update_layout(
-                    title='Performance do Modelo vs. Número de Features (Validação Cruzada)',
-                    xaxis_title='Número de Features Selecionadas',
-                    yaxis_title=f'Score de Validação ({ProjectConfig.RFE_CV_SCORING.upper()})',
-                    height=500
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            with st.container(border=True):
+                st.subheader("Resultados da Seleção de Features")
+                st.metric(label="Número ideal de features encontrado", value=selection_artifacts['optimal_n_features'])
 
-            with st.expander("Ver Lista de Features Selecionadas para a Modelagem"):
-                st.dataframe(pd.DataFrame(artifacts['selected_feature_names'], columns=["Feature Selecionada"]), use_container_width=True)
-            
-            st.info("Com as features mais importantes selecionadas, estamos prontos para a competição de modelos.", icon="🏆")
+                if selection_artifacts.get('cv_results_scores') is not None:
+                    cv_scores = selection_artifacts['cv_results_scores']
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=list(range(1, len(cv_scores) + 1)), y=cv_scores,
+                        mode='lines+markers', marker=dict(color=ProjectConfig.PRIMARY_COLOR), line=dict(width=3)
+                    ))
+                    fig.add_vline(x=selection_artifacts['optimal_n_features'], line_width=2, line_dash="dash", line_color=ProjectConfig.ACCENT_COLOR,
+                                 annotation_text="Número Ótimo de Features", annotation_position="top left")
+                    fig.update_layout(
+                        title='Performance do Modelo vs. Número de Features (Validação Cruzada)',
+                        xaxis_title='Número de Features Selecionadas',
+                        yaxis_title=f'Score de Validação ({ProjectConfig.RFE_CV_SCORING.upper()})',
+                        height=500
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with st.expander("Ver Lista de Features Selecionadas para a Modelagem"):
+                    st.dataframe(pd.DataFrame(selection_artifacts['selected_feature_names'], columns=["Feature Selecionada"]), use_container_width=True)
+
+                st.info("Com as features mais importantes selecionadas, estamos prontos para a competição de modelos.", icon="🏆")
+
+  
 
 @st.cache_data(show_spinner="Treinando e avaliando todos os 9 modelos... Este processo pode levar alguns minutos.")
 def train_baseline_models(_modeling_data, _selection_artifacts):
@@ -1558,12 +1617,13 @@ def render_local_xai_and_recommendations_module(final_artifacts):
                 base_value = shap_explanation_object.base_values
                 final_score = base_value + shap_explanation_object.values.sum()
 
-                st.markdown("""
+                # CORREÇÃO: Adicionado 'f' no início da string para formatação
+                st.markdown(f"""
                         **O gráfico de cascata acima detalha como o modelo construiu sua previsão para este cliente. A análise funciona da seguinte forma:**
                         1.  **Ponto de Partida (Valor Base `E[f(X)]`):** O modelo começa com a pontuação de risco média de todos os clientes, que é **{base_value:.2f}**. Este é o risco esperado antes de conhecer qualquer característica individual.
                         2.  **Construção do Risco:** As setas no gráfico mostram como cada característica do cliente empurrou a previsão para longe do valor base. Setas vermelhas (↑) aumentam o risco; setas azuis (↓) diminuem.
                         3.  **Previsão Final (`f(x)`):** A soma de todos esses impactos resulta na pontuação de risco final do cliente, que é **{final_score:.2f}**. Valores acima do base indicam um risco maior que a média.
-                        """.format(base_value=base_value, final_score=final_score))
+                        """)
 
                 shap_df = pd.DataFrame({
                     'feature': shap_explanation_object.feature_names,

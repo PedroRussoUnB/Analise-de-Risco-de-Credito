@@ -2,6 +2,7 @@ streamlit
 pandas
 numpy
 matplotlib
+plotly
 seaborn
 plotly
 scikit-learn
@@ -10,3 +11,4 @@ shap
 fpdf2
 xgboost
 lightgbm
+joblib
