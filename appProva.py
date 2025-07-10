@@ -1436,6 +1436,26 @@ def display_advanced_analysis_page():
         - **Monitoramento Contínuo:** Acompanhar as métricas de performance do modelo (como AUC e Recall) em produção para detectar quedas de desempenho e acionar a necessidade de uma revisão ou retreinamento antes do prazo.
     """)
     
+    st.markdown("##### 4. Criação de um Scorecard Preditivo Simplificado (SPS)")
+        st.markdown("""
+        - **Recomendação:** Traduzir a complexidade do modelo de IA em uma ferramenta simples e rápida para a equipe de linha de frente (analistas de crédito júnior, gerentes de conta), permitindo uma pré-análise antes mesmo de consultar o sistema completo.
+        - **Ação Prática:**
+            - **Desenvolver um Scorecard:** Com base nos 5 a 7 fatores mais importantes do SHAP (ex: `checking_status`, `duration`, `credit_history`, `purpose`, `savings_status`), criar um sistema de pontos. Por exemplo:
+                - Ter conta corrente `>=200 DM`: **-20 pontos** (reduz o risco)
+                - Histórico de crédito `crítico`: **+30 pontos** (aumenta o risco)
+                - Duração do empréstimo `> 36 meses`: **+15 pontos** (aumenta o risco)
+            - **Definir Faixas de Ação:** Clientes com pontuação abaixo de um certo limiar (ex: 10 pontos) poderiam ter um processo de aprovação agilizado. Clientes com pontuação acima de 40, por exemplo, seriam automaticamente direcionados para uma análise sênior. Isso otimiza o tempo da equipe e padroniza a avaliação inicial.
+        """)
+
+        st.markdown("##### 5. Estratégias de Marketing e Produto por Segmento de Cliente (Cluster)")
+        st.markdown("""
+        - **Recomendação:** Utilizar os segmentos de clientes descobertos pelo algoritmo K-Means para criar campanhas de marketing e ofertas de produtos personalizadas, aumentando a eficácia das ações e a satisfação do cliente.
+        - **Ação Prática:**
+            - **Cluster de "Alto Potencial" (Baixo Risco, Alto Valor de Crédito):** Oferecer produtos premium, como cartões de crédito com maiores limites, programas de cashback mais agressivos e acesso a linhas de crédito pré-aprovadas para investimentos.
+            - **Cluster de "Jovens Promissores" (Baixo Risco, Baixo Valor/Duração):** Focar em campanhas de educação financeira e construção de relacionamento. Oferecer aumentos de limite progressivos condicionados ao bom comportamento de pagamento para fidelizar este cliente no início de sua vida financeira.
+            - **Cluster de "Risco Elevado" (Alto Risco, Alto Valor/Duração):** Em vez de apenas negar crédito, este segmento pode ser alvo de campanhas de renegociação de dívidas ou workshops online sobre planejamento financeiro, transformando um risco em uma oportunidade de recuperação e educação.
+        """)
+    
     st.markdown("---")
     st.subheader("Evidências de Suporte à Decisão")
     st.markdown("As abas abaixo contêm as análises detalhadas que fundamentam as recomendações acima.")
@@ -1507,11 +1527,10 @@ def render_global_xai_module(final_artifacts):
 
 def render_local_xai_and_recommendations_module(final_artifacts):
     with st.container(border=True):
-        st.subheader("Análise de Previsão Individual (Por que este cliente?)")
+        st.subheader("Análise de Previsão Individual (Laudo de Risco Detalhado)")
         st.markdown("""
         Se a análise global mostra 'o que' o modelo valoriza, a análise local mostra o 'porquê' para um cliente específico.
-        Selecione um cliente do conjunto de teste abaixo para ver um **Laudo de Risco Detalhado**, que explica como suas características
-        o levaram da linha de base do modelo para sua pontuação final de risco.
+        Selecione um cliente das listas abaixo para ver uma explicação detalhada de como o modelo chegou à sua previsão. As listas agora estão separadas por **previsão do modelo** (acima ou abaixo de 50% de risco).
         """)
 
         y_test = final_artifacts['y_test']
@@ -1522,108 +1541,109 @@ def render_local_xai_and_recommendations_module(final_artifacts):
         info_df = pd.DataFrame({
             'Crédito': raw_data_test['credit_amount'],
             'Duração': raw_data_test['duration'],
+            'Idade': raw_data_test['age'],
             'Propósito': raw_data_test['purpose'],
-            'Prob_Risco (%)': y_proba * 100
+            'Risco Real': y_test.map({0: 'Bom', 1: 'Mau'}),
+            'Prob_Risco_Mau (%)': y_proba * 100
         }, index=y_test.index)
 
-        bad_risk_df = info_df[y_test == 1].sort_index()
-        good_risk_df = info_df[y_test == 0].sort_index()
+        predicted_bad_df = info_df[info_df['Prob_Risco_Mau (%)'] >= 50].sort_values(by='Prob_Risco_Mau (%)', ascending=False)
+        predicted_good_df = info_df[info_df['Prob_Risco_Mau (%)'] < 50].sort_values(by='Prob_Risco_Mau (%)', ascending=False)
 
         bad_risk_clients = {
-            f"Cliente {idx} | Risco Previsto: {row['Prob_Risco (%)']:.1f}% (Crédito: R${int(row['Crédito'])}, Prazo: {int(row['Duração'])} meses)": idx
-            for idx, row in bad_risk_df.iterrows()
+            f"Cliente {idx} | Risco Previsto: {row['Prob_Risco_Mau (%)']:.1f}% (Risco Real: {row['Risco Real']})": idx
+            for idx, row in predicted_bad_df.iterrows()
         }
 
         good_risk_clients = {
-            f"Cliente {idx} | Risco Previsto: {row['Prob_Risco (%)']:.1f}% (Crédito: R${int(row['Crédito'])}, Prazo: {int(row['Duração'])} meses)": idx
-            for idx, row in good_risk_df.iterrows()
+            f"Cliente {idx} | Risco Previsto: {row['Prob_Risco_Mau (%)']:.1f}% (Risco Real: {row['Risco Real']})": idx
+            for idx, row in predicted_good_df.iterrows()
         }
         
-        tab_bad, tab_good = st.tabs(["Analisar um Cliente de Mau Risco (Real)", "Analisar um Cliente de Bom Risco (Real)"])
+        tab_bad, tab_good = st.tabs(["Analisar Clientes Previstos como 'Mau Risco'", "Analisar Clientes Previstos como 'Bom Risco'"])
 
-        def generate_waterfall_plot(selected_client_label, client_dict):
+        def generate_detailed_report(selected_client_label, client_dict):
             if not selected_client_label:
-                st.info("Por favor, selecione um cliente da lista acima para ver a análise.")
+                st.info("Por favor, selecione um cliente da lista acima para ver o laudo.")
                 return
 
             original_index = client_dict[selected_client_label]
             try:
                 row_position = X_test_df.index.get_loc(original_index)
-                shap_values_for_instance = final_artifacts['shap_values'][row_position]
+                
+                st.markdown("---")
+                st.markdown(f"#### Laudo de Risco para o Cliente ID: {original_index}")
+
+                client_raw_data = raw_data_test.loc[original_index]
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Valor do Crédito", f"R$ {client_raw_data['credit_amount']:,}")
+                col2.metric("Duração (Meses)", client_raw_data['duration'])
+                col3.metric("Idade", client_raw_data['age'])
+                col4.metric("Propósito", client_raw_data['purpose'].replace('_', ' ').title())
+
+                st.markdown("##### Balança do Risco: Fatores Chave da Decisão")
 
                 shap_explanation_object = shap.Explanation(
-                    values=shap_values_for_instance,
+                    values=final_artifacts['shap_values'][row_position],
                     base_values=final_artifacts['expected_value'],
                     data=X_test_df.iloc[row_position],
                     feature_names=X_test_df.columns.tolist()
                 )
                 
+                shap_df = pd.DataFrame({
+                    'feature': shap_explanation_object.feature_names,
+                    'shap_value': shap_explanation_object.values
+                }).sort_values(by='shap_value', key=abs, ascending=False)
+                
+                risk_factors = shap_df[shap_df['shap_value'] > 0].head(3)
+                protective_factors = shap_df[shap_df['shap_value'] < 0].head(3)
+
+                col_risk, col_protection = st.columns(2)
+                with col_risk:
+                    with st.container(border=True):
+                        st.error("Fatores que AUMENTARAM o Risco 🚨", icon="🔺")
+                        for _, row in risk_factors.iterrows():
+                            st.markdown(f"**{row['feature'].replace('_', ' ').title()}** (+{row['shap_value']:.3f})")
+
+                with col_protection:
+                    with st.container(border=True):
+                        st.success("Fatores que DIMINUÍRAM o Risco ✅", icon="🔻")
+                        for _, row in protective_factors.iterrows():
+                            st.markdown(f"**{row['feature'].replace('_', ' ').title()}** ({row['shap_value']:.3f})")
+                
+                st.markdown("##### Análise do Gráfico de Cascata (Waterfall)")
+                st.markdown("O gráfico abaixo detalha visualmente como cada fator contribuiu para a pontuação final de risco do cliente, partindo de uma média geral (valor base).")
+                
                 fig, ax = plt.subplots()
-                shap.waterfall_plot(shap_explanation_object, max_display=15, show=False)
+                shap.waterfall_plot(shap_explanation_object, max_display=10, show=False)
                 st.pyplot(fig)
                 plt.close(fig)
 
-                st.markdown("---")
-                st.subheader("Análise Detalhada do Laudo de Risco Individual")
-                
-                base_value = shap_explanation_object.base_values
-                final_score = base_value + shap_explanation_object.values.sum()
-
-                st.markdown("""
-                        **O gráfico de cascata acima detalha como o modelo construiu sua previsão para este cliente. A análise funciona da seguinte forma:**
-                        1.  **Ponto de Partida (Valor Base `E[f(X)]`):** O modelo começa com a pontuação de risco média de todos os clientes, que é **{base_value:.2f}**. Este é o risco esperado antes de conhecer qualquer característica individual.
-                        2.  **Construção do Risco:** As setas no gráfico mostram como cada característica do cliente empurrou a previsão para longe do valor base. Setas vermelhas (↑) aumentam o risco; setas azuis (↓) diminuem.
-                        3.  **Previsão Final (`f(x)`):** A soma de todos esses impactos resulta na pontuação de risco final do cliente, que é **{final_score:.2f}**. Valores acima do base indicam um risco maior que a média.
-                        """.format(base_value=base_value, final_score=final_score))
-
-                shap_df = pd.DataFrame({
-                    'feature': shap_explanation_object.feature_names,
-                    'feature_value': shap_explanation_object.data,
-                    'shap_value': shap_explanation_object.values
-                })
-                
-                risk_factors = shap_df[shap_df['shap_value'] > 0].sort_values(by='shap_value', ascending=False)
-                protective_factors = shap_df[shap_df['shap_value'] < 0].sort_values(by='shap_value', ascending=True)
-
-                is_high_risk = final_artifacts['y_test'].loc[original_index] == 1
-
-                if is_high_risk:
-                    st.error("#### Diagnóstico: Perfil de Alto Risco", icon="🚨")
-                    st.markdown("""
-                    A pontuação final do cliente está significativamente acima do valor base, indicando que o modelo identificou um **conjunto de fatores de risco que superam os fatores de proteção**. A seguir, detalhamos a narrativa de risco construída pelo modelo:
-                    """)
-                    
-                    main_risk_factor = risk_factors.iloc[0]
+                st.markdown("##### Veredito Gerencial e Justificativa")
+                final_prob = info_df.loc[original_index, 'Prob_Risco_Mau (%)']
+                if final_prob >= 50:
+                    st.error("Veredito: **ALTO RISCO - RECOMENDAR ANÁLISE MANUAL OU RECUSA**", icon="✖️")
                     st.markdown(f"""
-                    - **Fator Dominante de Risco:** O principal impulsionador da previsão de risco foi **`{main_risk_factor['feature']}`**. O valor desta característica (`{main_risk_factor['feature_value']}`) é fortemente associado a inadimplência, de acordo com o padrão aprendido pelo modelo.
-                    - **Combinação de Riscos:** Além do fator principal, outras características como `{risk_factors.iloc[1]['feature']}` e `{risk_factors.iloc[2]['feature']}` contribuíram para elevar a pontuação. É a **combinação** desses múltiplos sinais de alerta que solidifica a previsão de alto risco.
-                    - **Fatores de Proteção Insuficientes:** Embora o cliente possa ter características positivas (como as listadas na seção 'Fatores de Proteção'), o impacto delas não foi suficiente para compensar o peso dos indicadores negativos.
+                    O modelo atribuiu uma probabilidade de inadimplência de **{final_prob:.1f}%**. A análise SHAP mostra que, embora existam fatores de proteção, os indicadores de risco, especialmente **{risk_factors.iloc[0]['feature'].replace('_', ' ').title()}**, pesaram de forma decisiva. A combinação de múltiplos fatores negativos cria um perfil de risco que, segundo os padrões aprendidos, justifica uma ação de crédito restritiva para proteger a saúde financeira da instituição.
                     """)
                 else:
-                    st.success("#### Diagnóstico: Perfil de Baixo Risco", icon="✅")
-                    st.markdown("""
-                    A pontuação final do cliente está consideravelmente abaixo do valor base. Isso significa que o modelo identificou um **perfil com fortes indicadores de proteção, que anulam eventuais fatores de risco**. A narrativa de confiança do modelo é a seguinte:
-                    """)
-                    
-                    main_protective_factor = protective_factors.iloc[0]
+                    st.success("Veredito: **BAIXO RISCO - RECOMENDAR APROVAÇÃO**", icon="✔️")
                     st.markdown(f"""
-                    - **Fator Dominante de Proteção:** A característica mais importante que reduziu a previsão de risco foi **`{main_protective_factor['feature']}`**. O valor apresentado pelo cliente (`{main_protective_factor['feature_value']}`) é um forte indicador de bom comportamento de pagamento.
-                    - **Perfil Sólido:** Outros fatores, como `{protective_factors.iloc[1]['feature']}` e `{protective_factors.iloc[2]['feature']}`, também contribuíram positivamente, reforçando a previsão de baixo risco.
-                    - **Riscos Mitigados:** Mesmo que o cliente tenha alguma característica que isoladamente poderia ser um risco (ex: alto valor de crédito), o conjunto de seus outros atributos positivos foi forte o suficiente para que o modelo o classificasse como um bom pagador.
+                    O modelo prevê uma baixa probabilidade de inadimplência de **{final_prob:.1f}%**. A "Balança do Risco" pende fortemente para os fatores de proteção, com destaque para **{protective_factors.iloc[0]['feature'].replace('_', ' ').title()}**. Este perfil de cliente demonstra características de estabilidade e confiabilidade que, segundo o modelo, superam quaisquer pontos de atenção, tornando a concessão de crédito uma decisão de baixo risco.
                     """)
 
             except (KeyError, IndexError) as e:
                     st.error(f"Não foi possível localizar ou processar os dados do cliente com índice {original_index}. Erro: {e}")
 
         with tab_bad:
-            st.markdown("**Selecione um cliente que o banco de dados identificou como `Mau Risco`:**")
-            selected_bad_label = st.selectbox("Selecione o Cliente:", options=list(bad_risk_clients.keys()), key="select_bad", index=None, placeholder="Escolha um cliente para analisar...")
-            generate_waterfall_plot(selected_bad_label, bad_risk_clients)
+            st.markdown("**Selecione um cliente que o modelo previu como `Mau Risco` (Probabilidade >= 50%):**")
+            selected_bad_label = st.selectbox("Selecione o Cliente:", options=list(bad_risk_clients.keys()), key="select_bad", index=None, placeholder="Escolha um cliente para o laudo...")
+            generate_detailed_report(selected_bad_label, bad_risk_clients)
 
         with tab_good:
-            st.markdown("**Selecione um cliente que o banco de dados identificou como `Bom Risco`:**")
-            selected_good_label = st.selectbox("Selecione o Cliente:", options=list(good_risk_clients.keys()), key="select_good", index=None, placeholder="Escolha um cliente para analisar...")
-            generate_waterfall_plot(selected_good_label, good_risk_clients)
+            st.markdown("**Selecione um cliente que o modelo previu como `Bom Risco` (Probabilidade < 50%):**")
+            selected_good_label = st.selectbox("Selecione o Cliente:", options=list(good_risk_clients.keys()), key="select_good", index=None, placeholder="Escolha um cliente para o laudo...")
+            generate_detailed_report(selected_good_label, good_risk_clients)
 
     with st.container(border=True):
         st.subheader("⭐ Tomada de Decisão e Aplicação Gerencial (Análise Crítica)")
@@ -1961,7 +1981,7 @@ def main():
         """
         <div style='text-align: left; font-size: 0.9em;'>
             <strong>Prova Final</strong><br>
-            <span>EPR0072 - SISTEMAS DE INFORMAÇÃO EM ENGENHARIA DE PRODUÇÃO</span><br>
+            <span>EPR0072 - Sistemas de Informação em Engenharia de Produção</span><br>
             <span>Prof. João Gabriel de Moraes Souza</span><br><br>
             <strong>Desenvolvedor:</strong><br>
             <span>Pedro Richetti Russo</span>
