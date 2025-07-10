@@ -34,6 +34,10 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.metrics import silhouette_score
 import shap
 
+MODO_PESQUISA = False
+
+FEATURES_PRE_SELECIONADAS = ['duration', 'credit_amount', 'installment_commitment', 'residence_since', 'age', 'existing_credits', 'num_dependents', 'credit_to_duration_ratio', 'credit_to_age_ratio', 'checking_status_<0', 'checking_status_>=200', 'checking_status_no checking', 'credit_history_critical/other existing credit', 'credit_history_delayed previously', 'credit_history_existing paid', 'credit_history_no credits/all paid', 'purpose_education', 'purpose_furniture/equipment', 'purpose_new car', 'purpose_radio/tv', 'purpose_used car', 'savings_status_<100', 'savings_status_>=1000', 'savings_status_no known savings', 'employment_4<=X<7', 'employment_<1', 'employment_>=7', 'employment_unemployed', 'personal_status_male mar/wid', 'personal_status_male single', 'other_parties_guarantor', 'other_parties_none', 'property_magnitude_life insurance', 'property_magnitude_no known property', 'property_magnitude_real estate', 'other_payment_plans_none', 'housing_own', 'housing_rent', 'job_skilled', 'job_unskilled resident', 'own_telephone_yes', 'foreign_worker_yes']
+
 # --- Configuração da Página e do Projeto ---
 
 st.set_page_config(
@@ -808,55 +812,62 @@ def run_rfe_cv_feature_selection(_modeling_data):
     
     return selection_artifacts
 
+# NOVO CÓDIGO - Substitua sua função render_feature_selection_module por esta.
 def render_feature_selection_module(modeling_data):
     """
-    Renderiza o módulo de UI para a Seleção de Features.
-    Explica a importância da etapa e exibe os resultados da execução do RFECV,
-    incluindo a curva de performance da validação cruzada que justifica a
-    escolha do número de features.
+    Renderiza o módulo de Seleção de Features.
+    Usa o "Interruptor Mágico" para decidir se executa a pesquisa demorada
+    ou se apenas mostra o resultado instantaneamente.
     """
     with st.container(border=True):
         st.subheader("Etapa 2: Foco no que Importa - Seleção de Features")
-        st.markdown("""
-        **O Quê?** Nem todas as características dos clientes são igualmente importantes para prever o risco. Nesta etapa, utilizamos uma técnica avançada chamada **RFECV (Recursive Feature Elimination with Cross-Validation)** para encontrar o subconjunto de features mais preditivo. O algoritmo treina um modelo repetidamente, removendo as features menos importantes a cada passo e validando o resultado, até encontrar o "time" ideal de variáveis.
 
-        **Justificativa da Escolha (RFECV):** Diferente de métodos univariados, o RFECV considera a interação entre as variáveis, resultando em um conjunto de features mais robusto e performático. Ele nos ajuda a reduzir a complexidade do modelo, diminuir o risco de overfitting e, muitas vezes, aumentar a interpretabilidade, focando apenas no que realmente importa.
-        """)
-        
-        if st.button("Executar Seleção de Features com RFECV", key="fs_button_rfe", type="primary"):
+        if MODO_PESQUISA:
+            # --- MODO LIGADO: SÓ PARA O DESENVOLVEDOR ---
+            st.warning("⚠️ MODO PESQUISA ATIVADO. A análise lenta do RFECV será executada.", icon="🔬")
+            st.info("Aguarde o processo terminar.")
+
+            # Executa a função lenta original
             selection_artifacts = run_rfe_cv_feature_selection(modeling_data)
-            st.session_state.artifacts['selection_artifacts'] = selection_artifacts
-            st.session_state.app_stage = 'features_selected'
-            st.success("Seleção de features com RFECV concluída!")
-            st.rerun()
-
-    if 'selection_artifacts' in st.session_state.get('artifacts', {}):
-        with st.container(border=True):
-            artifacts = st.session_state.artifacts['selection_artifacts']
-            st.subheader("Resultados da Seleção de Features")
-            st.metric(label="Número ideal de features encontrado", value=artifacts['optimal_n_features'])
+            selected_features = selection_artifacts['selected_feature_names']
             
-            if artifacts.get('cv_results_scores') is not None:
-                cv_scores = artifacts['cv_results_scores']
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=list(range(1, len(cv_scores) + 1)), y=cv_scores,
-                    mode='lines+markers', marker=dict(color=ProjectConfig.PRIMARY_COLOR), line=dict(width=3)
-                ))
-                fig.add_vline(x=artifacts['optimal_n_features'], line_width=2, line_dash="dash", line_color=ProjectConfig.ACCENT_COLOR,
-                             annotation_text="Número Ótimo de Features", annotation_position="top left")
-                fig.update_layout(
-                    title='Performance do Modelo vs. Número de Features (Validação Cruzada)',
-                    xaxis_title='Número de Features Selecionadas',
-                    yaxis_title=f'Score de Validação ({ProjectConfig.RFE_CV_SCORING.upper()})',
-                    height=500
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            st.success("Pesquisa Concluída! Copie a lista abaixo:")
+            # Exibe a lista de forma fácil de copiar
+            st.code(f"FEATURES_PRE_SELECIONADAS = {selected_features}")
+            st.stop() # Para a execução do app aqui, pois o objetivo foi só pegar a lista.
 
-            with st.expander("Ver Lista de Features Selecionadas para a Modelagem"):
-                st.dataframe(pd.DataFrame(artifacts['selected_feature_names'], columns=["Feature Selecionada"]), use_container_width=True)
+        else:
+            # --- MODO DESLIGADO: PARA O USUÁRIO FINAL ---
+            st.markdown("""
+            Para garantir a máxima performance, a seleção das melhores features foi realizada com o robusto método **RFECV**. Este processo computacionalmente intensivo foi executado previamente, e seus resultados estão carregados abaixo instantaneamente.
+            """)
             
-            st.info("Com as features mais importantes selecionadas, estamos prontos para a competição de modelos.", icon="🏆")
+            if not FEATURES_PRE_SELECIONADAS:
+                st.error("ERRO: A lista 'FEATURES_PRE_SELECIONADAS' está vazia. Você precisa executar o MODO PESQUISA primeiro.")
+                st.stop()
+
+            st.metric(label="Número ideal de features (pré-calculado)", value=len(FEATURES_PRE_SELECIONADAS))
+
+            with st.expander("Visualizar a Lista de Features Selecionadas"):
+                st.dataframe(pd.DataFrame(FEATURES_PRE_SELECIONADAS, columns=["Feature Selecionada"]), use_container_width=True)
+
+            # Prepara os artefatos para o resto do app funcionar
+            if 'selection_artifacts' not in st.session_state.get('artifacts', {}):
+                # Classe auxiliar para simular o seletor
+                class PrecomputedSelector:
+                    def __init__(self, feature_list):
+                        self.feature_list = feature_list
+                    def transform(self, X):
+                        df = pd.DataFrame(X, columns=modeling_data['processed_feature_names'])
+                        return df[self.feature_list].values
+                
+                st.session_state.artifacts['selection_artifacts'] = {
+                    'selector_object': PrecomputedSelector(FEATURES_PRE_SELECIONADAS),
+                    'optimal_n_features': len(FEATURES_PRE_SELECIONADAS),
+                    'selected_feature_names': FEATURES_PRE_SELECIONADAS
+                }
+            
+            st.success("Features carregadas! Podemos prosseguir para a competição de modelos.", icon="✅")
 
 @st.cache_data(show_spinner="Treinando e avaliando todos os 9 modelos... Este processo pode levar alguns minutos.")
 def train_baseline_models(_modeling_data, _selection_artifacts):
