@@ -263,11 +263,7 @@ def display_dataset_page():
     explicações detalhadas para cada passo.
     """
     st.header("Análise e Preparação dos Dados 📊")
-    st.markdown("""
-    O primeiro passo em qualquer projeto de ciência de dados é uma auditoria completa nos dados brutos.
-    Nesta seção, carregamos a base de dados **Credit Risk Customers** e realizamos um profiling para
-    entender sua estrutura, qualidade e características iniciais.
-    """)
+    st.markdown("O primeiro passo em qualquer projeto de ciência de dados é uma auditoria completa nos dados brutos para entender sua estrutura, qualidade e características. Esta etapa é fundamental para o sucesso dos modelos.")
 
     if not st.session_state.data_loaded:
         raw_df, profile_results = load_and_profile_data()
@@ -280,14 +276,12 @@ def display_dataset_page():
 
     st.subheader("Auditoria e Profiling dos Dados Brutos")
     st.markdown("""
-    Antes de qualquer modelagem, precisamos "entrevistar" nossos dados. A tabela detalhada abaixo é o resultado dessa entrevista. Ela nos ajuda a responder perguntas cruciais:
+    A tabela detalhada abaixo é o resultado da "entrevista" com nossos dados. Ela nos ajuda a responder perguntas cruciais que guiam o pré-processamento:
 
     - **Tipo:** A variável é um número, um texto ou uma categoria? Isso define como vamos tratá-la.
-    - **Nulos (%):** Existem dados faltando? Colunas com muitos valores nulos podem ser inúteis ou exigir um tratamento especial (imputação).
-    - **Valores Únicos:** Quantas categorias diferentes existem em uma variável de texto? Isso impacta nossa estratégia de codificação. Uma variável com milhares de valores únicos não pode ser tratada da mesma forma que uma com apenas duas (ex: 'sim'/'não').
-    - **Outliers (%):** Existem valores extremos que fogem muito do padrão? Outliers foram definidos aqui usando o **Método do IQR (Intervalo Interquartil)**. Calculamos o intervalo que contém os 50% centrais dos dados e consideramos um outlier qualquer ponto que esteja 1.5 vezes essa distância abaixo do primeiro quartil ou acima do terceiro. Identificar outliers é vital, pois eles podem distorcer os resultados dos modelos.
+    - **Nulos (%):** Existem dados faltando? A ausência de valores nulos neste dataset simplifica nosso trabalho.
+    - **Outliers (%):** Existem valores extremos (calculados pelo Método do IQR) que podem distorcer a análise? Vemos que `credit_amount` e `age` possuem outliers que os modelos precisarão ser robustos para lidar.
     """)
-
     with st.expander("Visualizar Relatório Detalhado por Atributo", expanded=True):
         profile_df = pd.DataFrame(st.session_state.artifacts['profile_results']['detalhes_variaveis']).set_index('Atributo')
         st.dataframe(profile_df, use_container_width=True)
@@ -295,12 +289,10 @@ def display_dataset_page():
     st.markdown("---")
     
     st.subheader("Processamento e Engenharia de Features")
-    st.markdown("""
-    Com os dados auditados, o próximo passo é transformá-los para otimizar o desempenho dos modelos. Isso inclui a codificação de variáveis e a **Engenharia de Features**, que é a arte de criar novos atributos a partir dos dados existentes para revelar padrões que não eram óbvios.
-    """)
+    st.markdown("Com os dados auditados, o próximo passo é transformá-los para otimizar o desempenho dos modelos. Isso inclui a codificação de variáveis e a **Engenharia de Features**, que é a arte de criar novos atributos a partir dos dados existentes para revelar padrões que não eram óbvios.")
     
     if st.button("Executar Engenharia de Features", type="primary"):
-        with st.spinner('Processando... Esta etapa pode levar alguns segundos.'):
+        with st.spinner('Processando...'):
             processed_df = execute_feature_engineering(st.session_state.raw_df)
             st.session_state.processed_df = processed_df
             st.session_state.data_processed = True
@@ -309,18 +301,33 @@ def display_dataset_page():
     if st.session_state.data_processed:
         st.subheader("Comparativo de Impacto: Antes vs. Depois da Transformação")
         st.markdown("""
-        O objetivo de mostrar os dados lado a lado é dar transparência ao processo. Na tabela da esquerda ("Antes"), vemos os dados como eles chegaram. Na tabela da direita ("Depois"), vemos o resultado do nosso trabalho: a coluna `class` foi transformada de texto ('good'/'bad') para números (0/1) e, mais importante, **novas colunas inteligentes foram criadas**, como `credit_to_duration_ratio`. Essas novas features enriquecem o dataset e dão aos nossos modelos de IA mais informações para aprender e tomar decisões melhores.
+        **Objetivo:** O propósito desta visualização é dar total transparência ao pré-processamento, mostrando o valor agregado da nossa preparação de dados. Abaixo, comparamos uma amostra dos dados antes e depois da engenharia de features para que você possa ver as mudanças concretas.
+
+        **O que observar:**
+        - **Na tabela "Antes"**: Note a coluna `class` com os valores em texto ('good', 'bad').
+        - **Na tabela "Depois"**: Observe como a coluna `class` foi transformada em um alvo numérico (0 para 'good', 1 para 'bad'), que é o formato que os modelos de IA entendem. Além disso, veja as **novas colunas** à direita (`credit_to_duration_ratio`, etc.), que foram criadas para fornecer mais informações e contexto para os algoritmos.
         """)
         
+        # Seleciona colunas relevantes para a comparação
+        raw_cols_to_show = ['class', 'credit_amount', 'duration', 'age']
+        processed_cols_to_show = ['class', 'credit_amount', 'duration', 'age', 'credit_to_duration_ratio', 'credit_to_age_ratio']
+        
+        # Garante que as colunas existem antes de tentar acessá-las
+        raw_sample = st.session_state.raw_df[raw_cols_to_show].head()
+        processed_sample = st.session_state.processed_df[processed_cols_to_show].head()
+
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**Dados Brutos (Amostra)**")
-            st.dataframe(st.session_state.raw_df.head())
+            st.markdown("**Tabela 1: Dados Brutos (Amostra)**")
+            st.dataframe(raw_sample)
         with col2:
-            st.markdown("**Dados Processados (Amostra)**")
-            st.dataframe(st.session_state.processed_df.head())
+            st.markdown("**Tabela 2: Dados Processados (Amostra)**")
+            st.dataframe(processed_sample)
 
-        st.info("Com os dados devidamente preparados e enriquecidos, agora podemos prosseguir para a Análise Exploratória (EDA).", icon="✅")
+        st.success("""
+        **Conclusão da Etapa:** A transformação foi bem-sucedida. Os dados agora estão em um formato numérico, otimizado e enriquecido com novas features, prontos para a fase de Análise Exploratória e, subsequentemente, para o treinamento dos modelos preditivos.
+        """)
+        st.info("Com os dados devidamente preparados, agora podemos prosseguir para a **Análise Exploratória (EDA)** no menu lateral.", icon="✅")
 
 @st.cache_data
 def calculate_descriptive_stats(series):
@@ -678,27 +685,18 @@ def prepare_data_for_modeling(_df, target, test_size, random_state):
 def render_data_preparation_module(df):
     """
     Renderiza o módulo de UI para a preparação dos dados de modelagem.
-    Inclui um botão para iniciar o processo e, em seguida, exibe os resultados
-    e o impacto visual do balanceamento com SMOTE.
     """
     with st.container(border=True):
         st.subheader("Etapa 1: Preparação e Balanceamento dos Dados")
         st.markdown("""
-        **O Quê?** Aqui, preparamos os dados para que os algoritmos de Machine Learning possam "entendê-los" da melhor forma possível. Realizamos três ações cruciais:
-        1.  **Divisão Estratificada:** Separamos os dados em um conjunto de **Treino** (para ensinar o modelo) e um de **Teste** (para avaliá-lo de forma imparcial). A estratificação garante que a proporção de clientes de `bom` e `mau` risco seja a mesma em ambos os conjuntos.
-        2.  **Pré-processamento:** Padronizamos as variáveis numéricas (`StandardScaler`) e codificamos as variáveis de texto (`OneHotEncoder`).
-        3.  **Balanceamento com SMOTE:** Nosso maior desafio é o desbalanceamento de classes. O **SMOTE (Synthetic Minority Over-sampling Technique)** resolve isso criando exemplos sintéticos e realistas de clientes de `mau` risco no conjunto de treino.
-        
-        **Justificativa da Escolha (SMOTE):** O SMOTE foi escolhido por ser uma técnica de oversampling sofisticada que cria novas instâncias baseadas nos vizinhos mais próximos, evitando o simples "copia e cola". Isso gera um conjunto de treino mais rico e diverso, ajudando os modelos a generalizarem melhor.
+        **O Quê?** Realizamos três ações cruciais:
+        1.  **Divisão Estratificada:** Separamos os dados em Treino e Teste, mantendo a proporção de bons/maus pagadores em ambos.
+        2.  **Pré-processamento:** Padronizamos variáveis numéricas e codificamos as categóricas.
+        3.  **Balanceamento com SMOTE:** Como temos poucos exemplos de 'maus pagadores', usamos SMOTE para criar exemplos sintéticos e realistas no conjunto de treino, ensinando o modelo a não ignorar a classe minoritária.
         """)
         
         if st.button("Executar Divisão e Balanceamento dos Dados", type="primary", key="prep_button"):
-            modeling_data = prepare_data_for_modeling(
-                df, 
-                target=ProjectConfig.TARGET_VARIABLE, 
-                test_size=ProjectConfig.TEST_SIZE_RATIO, 
-                random_state=ProjectConfig.RANDOM_STATE_SEED
-            )
+            modeling_data = prepare_data_for_modeling(df, ProjectConfig.TARGET_VARIABLE, ProjectConfig.TEST_SIZE_RATIO, ProjectConfig.RANDOM_STATE_SEED)
             st.session_state.artifacts['modeling_data'] = modeling_data
             st.session_state.app_stage = 'data_prepared'
             st.success("Dados preparados com sucesso!")
@@ -707,31 +705,42 @@ def render_data_preparation_module(df):
     if 'modeling_data' in st.session_state.get('artifacts', {}):
         with st.container(border=True):
             modeling_data = st.session_state.artifacts['modeling_data']
-            st.subheader("Resultados da Preparação e Impacto do SMOTE")
-            st.markdown("""
-            Veja abaixo a quantidade de clientes em cada conjunto. Note como o conjunto de treino se tornou perfeitamente balanceado (50/50) após o SMOTE. O gráfico de dispersão (PCA) mostra visualmente esse impacto, transformando a nuvem de pontos minoritária (vermelha) em um grupo denso e claro, ideal para o treinamento.
-            """)
+            st.subheader("Resultados da Preparação e Impacto Visual do SMOTE")
+            st.markdown("Note como o conjunto de treino se tornou perfeitamente balanceado (50/50) após o SMOTE. O gráfico PCA mostra visualmente esse impacto, transformando a nuvem de pontos minoritária em um grupo denso e claro, ideal para o treinamento.")
             
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3 = st.columns(3)
             col1.metric("Clientes Treino (Original)", len(modeling_data['y_train_orig']))
             col2.metric("Clientes Teste", len(modeling_data['y_test']))
             col3.metric("Clientes Treino (Pós-SMOTE)", len(modeling_data['y_train_resampled']))
-            y_resampled_counts = pd.Series(modeling_data['y_train_resampled']).value_counts(normalize=True) * 100
-            col4.metric("Balanceamento Pós-SMOTE", f"{y_resampled_counts[0]:.0f}% / {y_resampled_counts[1]:.0f}")
 
-            with st.expander("Visualizar o Impacto do SMOTE (Projeção PCA)"):
+            with st.expander("Visualizar o Impacto do SMOTE (Projeção PCA)", expanded=True):
                 pca_vis = PCA(n_components=2, random_state=ProjectConfig.RANDOM_STATE_SEED)
                 X_train_pca_before = pca_vis.fit_transform(modeling_data['X_train_orig'])
                 X_train_pca_after = pca_vis.transform(modeling_data['X_train_resampled'])
 
-                df_before = pd.DataFrame(X_train_pca_before, columns=['PC1', 'PC2'])
-                df_before['Risco'] = [f"Risco {v}" for v in modeling_data['y_train_orig'].values]
-                df_after = pd.DataFrame(X_train_pca_after, columns=['PC1', 'PC2'])
-                df_after['Risco'] = [f"Risco {v}" for v in modeling_data['y_train_resampled'].values]
+                # CORREÇÃO: Mapeia 0/1 para rótulos de texto para a legenda funcionar
+                labels_before = pd.Series(modeling_data['y_train_orig'].values).map({0: 'Bom Risco', 1: 'Mau Risco'})
+                labels_after = pd.Series(modeling_data['y_train_resampled']).map({0: 'Bom Risco', 1: 'Mau Risco'})
                 
                 fig = make_subplots(rows=1, cols=2, subplot_titles=("Antes do SMOTE", "Depois do SMOTE"))
-                fig.add_trace(go.Scatter(x=df_before['PC1'], y=df_before['PC2'], mode='markers', marker=dict(color=modeling_data['y_train_orig'].values, colorscale=[ProjectConfig.GOOD_RISK_COLOR, ProjectConfig.BAD_RISK_COLOR], showscale=False, opacity=0.7), name='Antes'), row=1, col=1)
-                fig.add_trace(go.Scatter(x=df_after['PC1'], y=df_after['PC2'], mode='markers', marker=dict(color=modeling_data['y_train_resampled'].values, colorscale=[ProjectConfig.GOOD_RISK_COLOR, ProjectConfig.BAD_RISK_COLOR], showscale=False, opacity=0.7), name='Depois'), row=1, col=2)
+                
+                # Gráfico 'Antes'
+                fig.add_trace(go.Scatter(
+                    x=X_train_pca_before[:, 0], y=X_train_pca_before[:, 1], mode='markers',
+                    marker=dict(color=modeling_data['y_train_orig'].values, colorscale=[ProjectConfig.GOOD_RISK_COLOR, ProjectConfig.BAD_RISK_COLOR], showscale=False, opacity=0.7),
+                    text=labels_before, customdata=labels_before, name='',
+                    hovertemplate='<b>%{customdata}</b><br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>'
+                ), row=1, col=1)
+
+                # Gráfico 'Depois'
+                fig.add_trace(go.Scatter(
+                    x=X_train_pca_after[:, 0], y=X_train_pca_after[:, 1], mode='markers',
+                    marker=dict(color=modeling_data['y_train_resampled'], colorscale=[ProjectConfig.GOOD_RISK_COLOR, ProjectConfig.BAD_RISK_COLOR], showscale=False, opacity=0.7),
+                    text=labels_after, customdata=labels_after, name='',
+                    hovertemplate='<b>%{customdata}</b><br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>'
+                ), row=1, col=2)
+
+                fig.update_layout(showlegend=False)
                 st.plotly_chart(fig, use_container_width=True)
 
 @st.cache_data(show_spinner="Executando Seleção de Features com RFECV... Este processo pode ser intensivo.")
@@ -1250,19 +1259,12 @@ def render_model_deep_dive_module(baseline_artifacts):
 @st.cache_resource(show_spinner="Finalizando modelo campeão e calculando explicações SHAP...")
 def finalize_and_explain_model(_baseline_artifacts, _modeling_data, _selection_artifacts):
     """
-    Identifica o melhor modelo de baseline, recalcula as predições e gera as
-    explicações SHAP, utilizando o explainer correto para cada tipo de modelo.
+    Identifica o melhor modelo, gera explicações SHAP e garante que o
+    índice do DataFrame de teste seja preservado para referência futura.
     """
-    if not _baseline_artifacts:
-        return None
-
-    best_model_name = max(
-        _baseline_artifacts, 
-        key=lambda k: _baseline_artifacts[k]['metrics']['AUC']
-    )
+    best_model_name = max(_baseline_artifacts, key=lambda k: _baseline_artifacts[k]['metrics']['AUC'])
     final_model_pipeline = _baseline_artifacts[best_model_name]['model_object']
     
-    # Se o modelo for um pipeline, extrai o estimador final
     if hasattr(final_model_pipeline, 'steps'):
         final_model = final_model_pipeline.steps[-1][1]
     else:
@@ -1273,35 +1275,37 @@ def finalize_and_explain_model(_baseline_artifacts, _modeling_data, _selection_a
     
     X_test_df = pd.DataFrame(
         X_test_final, 
-        columns=_selection_artifacts['selected_feature_names']
+        columns=_selection_artifacts['selected_feature_names'],
+        index=_modeling_data['y_test'].index
     )
     
-    # Lógica para usar o explainer correto dependendo do tipo de modelo
     model_type = type(final_model).__name__
     if model_type in ['XGBClassifier', 'LGBMClassifier', 'GradientBoostingClassifier', 'RandomForestClassifier', 'DecisionTreeClassifier']:
         explainer = shap.TreeExplainer(final_model)
-        shap_values_raw = explainer.shap_values(X_test_df)
     else:
-        st.info(f"Modelo '{model_type}' não é baseado em árvore. Utilizando KernelExplainer (pode ser mais lento).")
+        # Para KernelExplainer, é importante usar o pipeline completo que inclui pré-processamento, se aplicável
+        # No entanto, os dados aqui já estão processados, então usamos final_model_pipeline.predict_proba
         X_train_summary = shap.sample(X_train_final, 100)
         explainer = shap.KernelExplainer(final_model_pipeline.predict_proba, X_train_summary)
-        shap_values_raw = explainer.shap_values(X_test_df)
-
-    shap_values_for_bad_risk = shap_values_raw[1] if isinstance(shap_values_raw, list) and len(shap_values_raw) == 2 else shap_values_raw
-
+    
+    shap_values_obj = explainer(X_test_df)
+    
+    # Extrai o valor esperado (base value). Para modelos de duas classes, SHAP pode retornar uma lista com dois valores.
+    # Queremos o valor base para a classe 1 ('mau risco').
     expected_value = explainer.expected_value
-    if isinstance(expected_value, (list, np.ndarray)):
+    if isinstance(expected_value, list):
         expected_value = expected_value[1]
+
+    y_proba_test = final_model_pipeline.predict_proba(X_test_df)
 
     final_artifacts = {
         'model_name': best_model_name,
         'model_object': final_model_pipeline,
         'X_test_df': X_test_df,
         'y_test': _modeling_data['y_test'],
-        'y_pred_test': final_model_pipeline.predict(X_test_final),
-        'y_proba_test': final_model_pipeline.predict_proba(X_test_final),
-        'explainer': explainer,
-        'shap_values': shap_values_for_bad_risk,
+        'y_proba_test': y_proba_test,
+        # CORREÇÃO: Padronizando a chave para 'shap_values' e garantindo que seja o objeto de explicação para a classe de MAU RISCO.
+        'shap_values': shap_values_obj[:,:,1],
         'expected_value': expected_value
     }
     return final_artifacts
@@ -1368,27 +1372,58 @@ def display_advanced_analysis_page():
     # Seção de Tomada de Decisão (Item I.d da Prova)
     with st.container(border=True):
         st.subheader("⭐ Tomada de Decisão e Aplicação Gerencial (Análise Crítica)")
-        st.error("Esta seção sintetiza os resultados e apresenta recomendações acionáveis.", icon="⚠️")
-        st.markdown("""
-        Com base em todas as análises, especialmente nos insights dos gráficos SHAP, formulamos as seguintes recomendações para a área de crédito:
+    st.error("Esta seção sintetiza os resultados e apresenta recomendações acionáveis para o negócio.", icon="⚠️")
 
-        #### 1. Fatores Críticos para Previsão de Risco
-        A análise de explicabilidade global revelou que os fatores que mais aumentam a previsão de **'Mau Risco'** são:
-        - **`checking_status` (Status da Conta Corrente):** Clientes sem conta ou com status '...<0 DM' são os de maior risco. A falta de um relacionamento bancário sólido é um forte indicador negativo.
-        - **`duration` (Duração do Empréstimo):** Prazos de pagamento mais longos aumentam significativamente o risco.
-        - **`credit_history` (Histórico de Crédito):** Históricos com pagamentos críticos ou atrasos passados são os principais impulsionadores do risco.
-        - **`purpose` (Propósito):** Empréstimos para 'rádio/tv' e 'reparos' mostraram-se mais arriscados que os para 'carro (novo)'.
+    st.markdown("#### Perfil do Cliente de Baixo Risco (Bom Pagador)")
+    st.markdown("""
+    Antes de focar nos riscos, é crucial entender o que caracteriza um **bom cliente** aos olhos do modelo. A análise de explicabilidade (SHAP) revela que os fatores que mais consistentemente **diminuem** a probabilidade de risco (`bad`) são:
 
-        #### 2. Recomendações Estratégicas para a Área de Crédito
-        
-        - **Segmentação e Políticas de Crédito Adaptativas:**
-          - **Recomendação:** Abandonar uma política de crédito única e adotar abordagens diferentes para perfis distintos.
-          - **Ação Prática:** Para o perfil **"Clientes sem imóvel próprio (`housing`='rent'), com baixo grau de instrução (`job`='unskilled') e histórico de atrasos (`credit_history`='critical account')**, que consistentemente apresentam altos SHAP-values para risco `bad`, **sugere-se uma política de crédito mais conservadora**. Isso inclui limites de crédito iniciais mais baixos, taxas de juros ajustadas ao risco, e possivelmente a exigência de garantias adicionais. A aprovação automática para este segmento deve ser desativada, forçando uma análise manual.
+    - **`checking_status` (Conta Corrente):** Ter uma conta corrente estabelecida, especialmente com saldo positivo (`> 200 DM`), é o mais forte indicador de estabilidade financeira e baixo risco.
+    - **`credit_history` (Histórico de Crédito):** Clientes com histórico de pagamentos em dia (`all paid`) ou que quitaram créditos anteriores na instituição (`existing paid`) são vistos como altamente confiáveis.
+    - **`purpose` (Propósito do Crédito):** Solicitações para 'car (new)' e 'education' tendem a ter menor risco associado.
+    - **`savings_status` (Poupança):** A presença de uma conta poupança, mesmo com valores baixos, é um fator de proteção.
 
-        - **Desenvolvimento de Produtos de Curto Prazo:**
-          - **Recomendação:** Mitigar o risco associado à variável `duration`.
-          - **Ação Prática:** Criar e promover linhas de crédito de curto prazo (6 a 12 meses). Estes produtos podem servir como uma "porta de entrada" segura para novos clientes, permitindo que a instituição construa um histórico de pagamento antes de oferecer limites mais altos ou prazos mais longos.
-        """)
+    **Insight:** O cliente ideal para expansão da base não é apenas jovem ou de classe média, mas aquele que já demonstra um mínimo de organização financeira, como manter uma conta corrente ativa e um histórico de pagamentos limpo.
+    """)
+
+    st.markdown("---")
+
+    st.markdown("#### Recomendações Estratégicas para a Área de Crédito")
+    st.markdown("""
+    Com base nas análises preditivas e de explicabilidade, formulamos as seguintes recomendações para apoiar a expansão da base de clientes de forma sustentável:
+    """)
+
+    st.markdown("##### 1. Políticas de Crédito Adaptativas por Segmento de Risco")
+    st.markdown("""
+    - **Recomendação:** Abandonar uma política única ("one-size-fits-all") e implementar regras de negócio distintas para diferentes perfis de risco identificados pelo modelo.
+    - **Ação Prática:**
+        - **Perfil de Alto Risco:** Para clientes com múltiplos fatores de risco (ex: sem conta corrente, histórico problemático, prazos longos), a aprovação automática deve ser bloqueada, exigindo uma **análise manual criteriosa**. Caso aprovado, aplicar **limites de crédito iniciais mais baixos** e taxas de juros ajustadas ao risco.
+        - **Perfil de Risco Moderado:** Para clientes com um perfil misto, pode-se aprovar com um limite padrão, mas incluí-los em um programa de **monitoramento reforçado** nos primeiros 6 meses.
+    """)
+
+    st.markdown("##### 2. Desenvolvimento de Produtos para Expansão Segura da Base")
+    st.markdown("""
+    - **Recomendação:** A empresa deseja atrair jovens adultos, que podem não ter um histórico de crédito robusto. O modelo mostra que `duration` e `credit_amount` são fatores de risco importantes. Portanto, a estratégia de expansão deve ser feita com produtos de menor risco.
+    - **Ação Prática:**
+        - **Criar "Cartões de Crédito de Entrada":** Oferecer cartões com limites pré-aprovados baixos (ex: R$ 500 a R$ 1.500) para jovens e clientes novos no sistema de crédito. O bom uso deste produto pode habilitar aumentos de limite progressivos.
+        - **Focar em Crédito Pessoal de Curto Prazo:** Promover linhas de crédito para fins específicos (como 'education' ou 'repairs') com prazos de até 12 meses, que apresentam risco menor segundo o modelo.
+    """)
+
+    st.markdown("##### 3. Gestão Proativa da Carteira de Clientes Atuais")
+    st.markdown("""
+    - **Recomendação:** Utilizar o modelo de risco não apenas para novas aquisições, mas também para monitorar a saúde da carteira de clientes existente.
+    - **Ação Prática:**
+        - **Implementar um Sistema de Alerta Precoce:** Executar o modelo periodicamente sobre a base de clientes. Se a pontuação de risco de um cliente aumentar significativamente (devido a mudanças em seu comportamento financeiro externo, se disponível), o sistema deve alertar a equipe de relacionamento.
+        - **Ações de Retenção e Educação:** Para clientes cujo risco aumenta, a empresa pode agir proativamente, oferecendo **programas de educação financeira, opções de renegociação de dívida ou consultoria**, antes que a inadimplência ocorra.
+    """)
+
+    st.markdown("##### 4. Governança e Manutenção do Modelo Preditivo")
+    st.markdown("""
+    - **Recomendação:** Um modelo de machine learning não é estático. Seu desempenho pode degradar com o tempo devido a mudanças no cenário econômico ou no comportamento dos clientes ("concept drift").
+    - **Ação Prática:**
+        - **Estabelecer um Cronograma de Retreinamento:** Definir uma política para retreinar o modelo a cada 6 ou 12 meses, utilizando novos dados de clientes.
+        - **Monitoramento Contínuo:** Acompanhar as métricas de performance do modelo (como AUC e Recall) em produção para detectar quedas de desempenho e acionar a necessidade de uma revisão ou retreinamento antes do prazo.
+    """)
     
     st.markdown("---")
     st.subheader("Evidências de Suporte à Decisão")
@@ -1409,36 +1444,55 @@ def display_advanced_analysis_page():
             render_unsupervised_analysis_module(processed_df_for_clustering)
 
 def render_global_xai_module(final_artifacts):
+    """
+    Renderiza os gráficos de SHAP para uma análise global, com formatação ajustada
+    e interpretações detalhadas para o contexto de negócio.
+    """
     with st.container(border=True):
         st.subheader("Análise de Explicabilidade Global (SHAP)")
         st.markdown("Aqui, abrimos a 'caixa-preta' do modelo para entender quais fatores ele considera mais importantes em suas decisões, de forma geral para todos os clientes do conjunto de teste.")
         
         X_test_df = final_artifacts['X_test_df']
+        # CORREÇÃO: Acessando a chave correta 'shap_values'
         shap_values = final_artifacts['shap_values']
 
         st.markdown("#### Importância Geral das Features (SHAP Bar Plot)")
-        st.markdown("Este gráfico ranqueia as features pelo seu impacto médio absoluto nas previsões. Features no topo são as que mais influenciaram o modelo, tanto para aumentar quanto para diminuir o risco.")
         
-        plt.figure(figsize=(10, 8))
-        shap.summary_plot(shap_values, X_test_df, plot_type="bar", show=False, max_display=15, plot_size=None)
-        plt.title(f"Importância Média das Features para o Modelo {final_artifacts['model_name']}", fontsize=16)
-        st.pyplot(plt.gcf())
-        plt.clf()
+        fig_bar, ax_bar = plt.subplots()
+        # A função summary_plot funciona corretamente com o objeto de explicação
+        shap.summary_plot(shap_values, X_test_df, plot_type="bar", show=False, max_display=15)
+        plt.title(f"Importância Média das Features (Modelo: {final_artifacts['model_name']})")
+        plt.tight_layout()
+        st.pyplot(fig_bar)
+        plt.close(fig_bar)
+        
+        st.markdown("""
+        **Análise do Gráfico de Barras:**
+        - **O que ele mostra?** O gráfico acima ranqueia as variáveis pela sua **influência média absoluta** nas previsões. Features no topo são as que mais pesaram para o modelo tomar uma decisão, independentemente se foi para 'bom' ou 'mau' risco.
+        - **Insight Gerencial:** Fica claro que `checking_status` (status da conta corrente), `duration` (duração do empréstimo) e `credit_history` (histórico de crédito) são os pilares da decisão do modelo. Isso significa que, para uma análise de crédito rápida e eficaz, estas são as três informações mais valiosas a serem coletadas e validadas sobre um cliente.
+        """)
         
         st.markdown("---")
         
         st.markdown("#### Impacto e Distribuição das Features (SHAP Beeswarm Plot)")
-        st.markdown("""
-        Este é o gráfico mais poderoso para a análise global. Cada ponto é um cliente e uma feature.
-        - **Eixo X (Valor SHAP):** O impacto na previsão. Valores positivos **aumentam a probabilidade de `Mau Risco`**. Valores negativos diminuem.
-        - **Cor do Ponto:** O valor original da feature (Vermelho = Alto, Azul = Baixo).
+        
+        fig_beeswarm, ax_beeswarm = plt.subplots()
+        shap.summary_plot(shap_values, X_test_df, plot_type='dot', show=False, max_display=15)
+        plt.title("Impacto de Cada Feature no Risco de Crédito")
+        plt.tight_layout()
+        st.pyplot(fig_beeswarm)
+        plt.close(fig_beeswarm)
 
-        **Exemplo de Leitura:** Se pontos vermelhos para a feature `duration` estão à direita (SHAP > 0), significa que durações de empréstimo mais longas (valor alto) aumentam o risco previsto.
+        st.markdown("""
+        **Análise Detalhada do Gráfico de Dispersão:**
+        - **O que ele mostra?** Este gráfico é mais poderoso, pois mostra a **direção do impacto**. Cada ponto é um cliente para uma dada feature. Pontos à direita do eixo zero aumentam o risco de inadimplência; pontos à esquerda diminuem. A cor indica o valor da feature (Vermelho = Alto, Azul = Baixo).
+                
+        **Insights Gerenciais:**
+        - **`checking_status`:** Pontos vermelhos (status 'no checking' ou '...<0 DM') estão quase todos à direita, com altos valores SHAP. Isso **confirma** que ter uma conta corrente ruim ou inexistente é o maior indicador de risco.
+        - **`duration`:** A dispersão de vermelho para a direita mostra que quanto **maior a duração** do empréstimo, **maior o risco** previsto pelo modelo.
+        - **`credit_amount`:** Similar à duração, valores de crédito mais altos (pontos vermelhos) tendem a aumentar o risco.
+        - **`age`:** A tendência aqui é sutil, mas parece que idades mais baixas (pontos azuis) estão levemente associadas a um maior risco (valores SHAP positivos).
         """)
-        plt.figure(figsize=(10, 8))
-        shap.summary_plot(shap_values, X_test_df, plot_type='dot', show=False, max_display=15, plot_size=None)
-        st.pyplot(plt.gcf())
-        plt.clf()
 
 def render_local_xai_and_recommendations_module(final_artifacts):
     with st.container(border=True):
@@ -1450,86 +1504,115 @@ def render_local_xai_and_recommendations_module(final_artifacts):
         """)
 
         y_test = final_artifacts['y_test']
+        y_proba = final_artifacts['y_proba_test'][:, 1]
         X_test_df = final_artifacts['X_test_df']
-        
         raw_data_test = st.session_state.artifacts['modeling_data']['X_test_raw']
 
-        good_risk_clients = {f"Cliente {idx} (Idade: {raw_data_test.loc[idx, 'age']}, Crédito: {raw_data_test.loc[idx, 'credit_amount']})": idx for idx in y_test[y_test == 0].index}
-        bad_risk_clients = {f"Cliente {idx} (Idade: {raw_data_test.loc[idx, 'age']}, Crédito: {raw_data_test.loc[idx, 'credit_amount']})": idx for idx in y_test[y_test == 1].index}
+        info_df = pd.DataFrame({
+            'Crédito': raw_data_test['credit_amount'],
+            'Duração': raw_data_test['duration'],
+            'Propósito': raw_data_test['purpose'],
+            'Prob_Risco (%)': y_proba * 100
+        }, index=y_test.index)
+
+        bad_risk_df = info_df[y_test == 1].sort_index()
+        good_risk_df = info_df[y_test == 0].sort_index()
+
+        bad_risk_clients = {
+            f"Cliente {idx} | Risco Previsto: {row['Prob_Risco (%)']:.1f}% (Crédito: R${int(row['Crédito'])}, Prazo: {int(row['Duração'])} meses)": idx
+            for idx, row in bad_risk_df.iterrows()
+        }
+
+        good_risk_clients = {
+            f"Cliente {idx} | Risco Previsto: {row['Prob_Risco (%)']:.1f}% (Crédito: R${int(row['Crédito'])}, Prazo: {int(row['Duração'])} meses)": idx
+            for idx, row in good_risk_df.iterrows()
+        }
         
-        tab_bad, tab_good = st.tabs(["Analisar um Cliente de Mau Risco", "Analisar um Cliente de Bom Risco"])
+        tab_bad, tab_good = st.tabs(["Analisar um Cliente de Mau Risco (Real)", "Analisar um Cliente de Bom Risco (Real)"])
 
-        def generate_waterfall_plot(selected_client_label, client_dict, plot_key):
-            if selected_client_label:
-                original_index = client_dict[selected_client_label]
-                try:
-                    row_position = X_test_df.index.get_loc(original_index)
+        def generate_waterfall_plot(selected_client_label, client_dict):
+            if not selected_client_label:
+                st.info("Por favor, selecione um cliente da lista acima para ver a análise.")
+                return
+
+            original_index = client_dict[selected_client_label]
+            try:
+                row_position = X_test_df.index.get_loc(original_index)
+                shap_values_for_instance = final_artifacts['shap_values'][row_position]
+
+                shap_explanation_object = shap.Explanation(
+                    values=shap_values_for_instance,
+                    base_values=final_artifacts['expected_value'],
+                    data=X_test_df.iloc[row_position],
+                    feature_names=X_test_df.columns.tolist()
+                )
+                
+                fig, ax = plt.subplots()
+                shap.waterfall_plot(shap_explanation_object, max_display=15, show=False)
+                st.pyplot(fig)
+                plt.close(fig)
+
+                st.markdown("---")
+                st.subheader("Análise Detalhada do Laudo de Risco Individual")
+                
+                base_value = shap_explanation_object.base_values
+                final_score = base_value + shap_explanation_object.values.sum()
+
+                st.markdown("""
+                        **O gráfico de cascata acima detalha como o modelo construiu sua previsão para este cliente. A análise funciona da seguinte forma:**
+                        1.  **Ponto de Partida (Valor Base `E[f(X)]`):** O modelo começa com a pontuação de risco média de todos os clientes, que é **{base_value:.2f}**. Este é o risco esperado antes de conhecer qualquer característica individual.
+                        2.  **Construção do Risco:** As setas no gráfico mostram como cada característica do cliente empurrou a previsão para longe do valor base. Setas vermelhas (↑) aumentam o risco; setas azuis (↓) diminuem.
+                        3.  **Previsão Final (`f(x)`):** A soma de todos esses impactos resulta na pontuação de risco final do cliente, que é **{final_score:.2f}**. Valores acima do base indicam um risco maior que a média.
+                        """.format(base_value=base_value, final_score=final_score))
+
+                shap_df = pd.DataFrame({
+                    'feature': shap_explanation_object.feature_names,
+                    'feature_value': shap_explanation_object.data,
+                    'shap_value': shap_explanation_object.values
+                })
+                
+                risk_factors = shap_df[shap_df['shap_value'] > 0].sort_values(by='shap_value', ascending=False)
+                protective_factors = shap_df[shap_df['shap_value'] < 0].sort_values(by='shap_value', ascending=True)
+
+                is_high_risk = final_artifacts['y_test'].loc[original_index] == 1
+
+                if is_high_risk:
+                    st.error("#### Diagnóstico: Perfil de Alto Risco", icon="🚨")
+                    st.markdown("""
+                    A pontuação final do cliente está significativamente acima do valor base, indicando que o modelo identificou um **conjunto de fatores de risco que superam os fatores de proteção**. A seguir, detalhamos a narrativa de risco construída pelo modelo:
+                    """)
                     
-                    shap_values_for_instance = final_artifacts['shap_values'][row_position]
-
-                    if shap_values_for_instance.ndim == 2:
-                        values_for_plot = shap_values_for_instance[:, 1]
-                    else:
-                        values_for_plot = shap_values_for_instance
-
-                    shap_explanation_object = shap.Explanation(
-                        values=values_for_plot,
-                        base_values=final_artifacts['expected_value'],
-                        data=X_test_df.iloc[row_position],
-                        feature_names=X_test_df.columns.tolist()
-                    )
+                    main_risk_factor = risk_factors.iloc[0]
+                    st.markdown(f"""
+                    - **Fator Dominante de Risco:** O principal impulsionador da previsão de risco foi **`{main_risk_factor['feature']}`**. O valor desta característica (`{main_risk_factor['feature_value']}`) é fortemente associado a inadimplência, de acordo com o padrão aprendido pelo modelo.
+                    - **Combinação de Riscos:** Além do fator principal, outras características como `{risk_factors.iloc[1]['feature']}` e `{risk_factors.iloc[2]['feature']}` contribuíram para elevar a pontuação. É a **combinação** desses múltiplos sinais de alerta que solidifica a previsão de alto risco.
+                    - **Fatores de Proteção Insuficientes:** Embora o cliente possa ter características positivas (como as listadas na seção 'Fatores de Proteção'), o impacto delas não foi suficiente para compensar o peso dos indicadores negativos.
+                    """)
+                else:
+                    st.success("#### Diagnóstico: Perfil de Baixo Risco", icon="✅")
+                    st.markdown("""
+                    A pontuação final do cliente está consideravelmente abaixo do valor base. Isso significa que o modelo identificou um **perfil com fortes indicadores de proteção, que anulam eventuais fatores de risco**. A narrativa de confiança do modelo é a seguinte:
+                    """)
                     
-                    fig, ax = plt.subplots()
-                    shap.waterfall_plot(shap_explanation_object, max_display=15, show=False)
-                    st.pyplot(fig)
-                    plt.close(fig)
+                    main_protective_factor = protective_factors.iloc[0]
+                    st.markdown(f"""
+                    - **Fator Dominante de Proteção:** A característica mais importante que reduziu a previsão de risco foi **`{main_protective_factor['feature']}`**. O valor apresentado pelo cliente (`{main_protective_factor['feature_value']}`) é um forte indicador de bom comportamento de pagamento.
+                    - **Perfil Sólido:** Outros fatores, como `{protective_factors.iloc[1]['feature']}` e `{protective_factors.iloc[2]['feature']}`, também contribuíram positivamente, reforçando a previsão de baixo risco.
+                    - **Riscos Mitigados:** Mesmo que o cliente tenha alguma característica que isoladamente poderia ser um risco (ex: alto valor de crédito), o conjunto de seus outros atributos positivos foi forte o suficiente para que o modelo o classificasse como um bom pagador.
+                    """)
 
-                    st.markdown("---")
-                    st.markdown("#### Interpretação Detalhada do Laudo de Risco")
-                    
-                    final_prediction_value = shap_explanation_object.base_values + shap_explanation_object.values.sum()
-                    st.info(f"O modelo partiu de uma **pontuação base de {shap_explanation_object.base_values:.2f}** (média do modelo) e, após analisar as características deste cliente, chegou a uma **pontuação de risco final de {final_prediction_value:.2f}**.")
-
-                    shap_df = pd.DataFrame({
-                        'feature': shap_explanation_object.feature_names,
-                        'value': shap_explanation_object.data,
-                        'shap_value': shap_explanation_object.values
-                    })
-                    
-                    risk_factors = shap_df[shap_df['shap_value'] > 0].sort_values(by='shap_value', ascending=False).head(3)
-                    protective_factors = shap_df[shap_df['shap_value'] < 0].sort_values(by='shap_value', ascending=True).head(3)
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        st.error("Principais Fatores de RISCO (Aumentaram a pontuação)")
-                        if not risk_factors.empty:
-                            for _, row in risk_factors.iterrows():
-                                st.markdown(f"- **{row['feature']} = `{row['value']}`**: Aumentou o risco em **{row['shap_value']:.3f}**.")
-                        else:
-                            st.markdown("Nenhum fator de risco significativo encontrado.")
-                    
-                    with col2:
-                        st.success("Principais Fatores de PROTEÇÃO (Diminuíram a pontuação)")
-                        if not protective_factors.empty:
-                            for _, row in protective_factors.iterrows():
-                                st.markdown(f"- **{row['feature']} = `{row['value']}`**: Diminuiu o risco em **{row['shap_value']:.3f}**.")
-                        else:
-                            st.markdown("Nenhum fator de proteção significativo encontrado.")
-
-                except (KeyError, IndexError) as e:
-                     st.error(f"Não foi possível localizar ou processar os dados do cliente com índice {original_index}. Erro: {e}")
-                     return
+            except (KeyError, IndexError) as e:
+                    st.error(f"Não foi possível localizar ou processar os dados do cliente com índice {original_index}. Erro: {e}")
 
         with tab_bad:
-            st.markdown("**Selecione um cliente classificado como `Mau Risco` (real):**")
-            selected_bad_label = st.selectbox("Selecione o Cliente:", options=list(bad_risk_clients.keys()), key="select_bad")
-            generate_waterfall_plot(selected_bad_label, bad_risk_clients, "waterfall_bad")
+            st.markdown("**Selecione um cliente que o banco de dados identificou como `Mau Risco`:**")
+            selected_bad_label = st.selectbox("Selecione o Cliente:", options=list(bad_risk_clients.keys()), key="select_bad", index=None, placeholder="Escolha um cliente para analisar...")
+            generate_waterfall_plot(selected_bad_label, bad_risk_clients)
 
         with tab_good:
-            st.markdown("**Selecione um cliente classificado como `Bom Risco` (real):**")
-            selected_good_label = st.selectbox("Selecione o Cliente:", options=list(good_risk_clients.keys()), key="select_good")
-            generate_waterfall_plot(selected_good_label, good_risk_clients, "waterfall_good")
+            st.markdown("**Selecione um cliente que o banco de dados identificou como `Bom Risco`:**")
+            selected_good_label = st.selectbox("Selecione o Cliente:", options=list(good_risk_clients.keys()), key="select_good", index=None, placeholder="Escolha um cliente para analisar...")
+            generate_waterfall_plot(selected_good_label, good_risk_clients)
 
     with st.container(border=True):
         st.subheader("⭐ Tomada de Decisão e Aplicação Gerencial (Análise Crítica)")
