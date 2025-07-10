@@ -1961,7 +1961,7 @@ def main():
         """
         <div style='text-align: left; font-size: 0.9em;'>
             <strong>Prova Final</strong><br>
-            <span>EPR0072 - Sistemas de Informação</span><br>
+            <span>EPR0072 - SISTEMAS DE INFORMAÇÃO EM ENGENHARIA DE PRODUÇÃO</span><br>
             <span>Prof. João Gabriel de Moraes Souza</span><br><br>
             <strong>Desenvolvedor:</strong><br>
             <span>Pedro Richetti Russo</span>
