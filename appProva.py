@@ -1437,7 +1437,7 @@ def display_advanced_analysis_page():
     """)
     
     st.markdown("##### 4. Criação de um Scorecard Preditivo Simplificado (SPS)")
-        st.markdown("""
+    st.markdown("""
         - **Recomendação:** Traduzir a complexidade do modelo de IA em uma ferramenta simples e rápida para a equipe de linha de frente (analistas de crédito júnior, gerentes de conta), permitindo uma pré-análise antes mesmo de consultar o sistema completo.
         - **Ação Prática:**
             - **Desenvolver um Scorecard:** Com base nos 5 a 7 fatores mais importantes do SHAP (ex: `checking_status`, `duration`, `credit_history`, `purpose`, `savings_status`), criar um sistema de pontos. Por exemplo:
